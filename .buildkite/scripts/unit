@@ -1,0 +1,35 @@
+#!/bin/bash
+
+set -e
+
+CONSULVERSION=1.3.1
+
+function get_consul() {
+    curl -L https://releases.hashicorp.com/consul/${CONSULVERSION}/consul_${CONSULVERSION}_linux_amd64.zip \
+        | gunzip > consul
+    chmod +x consul 
+    [[ ${PIPESTATUS[0]} == 0 ]] || return 1
+}
+
+apt-get update >/dev/null && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    curl python3-pip python3-dev python3-setuptools python3-wheel build-essential \
+    tclsh expect-dev >/dev/null
+
+pip3 install -r requirements.txt >/dev/null
+pip3 install behave codacy-coverage coverage coveralls flake8 mock pytest-cov pytest setuptools >/dev/null
+
+attempt_num=1
+until get_consul; do
+    [[ $attempt_num -ge 3 ]] && exit 1
+    echo "Attempt $attempt_num failed! Trying again in $attempt_num seconds..."
+    sleep $(( attempt_num++ ))
+done
+
+echo Running unit tests using "$(python3 --version)"
+unbuffer python3 setup.py test
+python3 setup.py flake8
+
+echo Running acceptance tests using "$(python3 --version)"
+echo "TODO(worxli): Skipping..."
+# PATH=.:/usr/lib/postgresql/10/bin:$PATH DCS=consul unbuffer behave
+

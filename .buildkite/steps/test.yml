@@ -1,0 +1,16 @@
+- label: Run patroni unit test and linting
+  command:
+    - $BASE/scripts/unit
+  plugins:
+    - docker#v3.0.1:
+        image: postgres:10
+  retry:
+    automatic:
+      exit_status: 255
+  timeout_in_minutes: 10
+- label: Run acceptance test
+  command: $BASE/scripts/acceptance
+  retry:
+    automatic:
+      exit_status: 255
+  timeout_in_minutes: 10

@@ -1,0 +1,12 @@
+#!/bin/bash
+
+set -e
+
+# Install python3 and plumbum
+sudo yum install python3 -y >/dev/null
+pip3 install --user plumbum >/dev/null
+
+# Run acceptance tests
+echo "do some tests now"
+docker-compose --log-level ERROR -f $BASE/files/docker-compose.yml up -d
+docker-compose --log-level ERROR -f $BASE/files/docker-compose.yml down
