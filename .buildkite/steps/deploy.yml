@@ -2,28 +2,28 @@
 - label: Push patroni:latest
   plugins:
     - docker-login#v2.0.1:
-        server: $REGISTRY #TODO(worxli): push to GCR
+        server: $REGISTRY
         username: $REGISTRY_USER
         password-env: REGISTRY_PASSWORD
     - docker-compose#v3.0.0:
-        config: $BASE/files/docker-compose.yml
+        config: $BASE/files/dc-patroni.yml
         build: patroni
     - docker-compose#v3.0.0:
-        config: $BASE/files/docker-compose.yml
+        config: $BASE/files/dc-patroni.yml
         push:
           - patroni:$PATRONI_IMG:latest
   branches: "master"
 - label: Push patroni:$BUILDKITE_TAG
   plugins:
     - docker-login#v2.0.1:
-        server: $REGISTRY #TODO(worxli): push to GCR
+        server: $REGISTRY
         username: $REGISTRY_USER
         password-env: REGISTRY_PASSWORD
     - docker-compose#v3.0.0:
-        config: $BASE/files/docker-compose.yml
+        config: $BASE/files/dc-patroni.yml
         build: patroni
     - docker-compose#v3.0.0:
-        config: $BASE/files/docker-compose.yml
+        config: $BASE/files/dc-patroni.yml
         push:
           - "patroni:$PATRONI_IMG:$BUILDKITE_TAG"
   branches: "v*.*.*"

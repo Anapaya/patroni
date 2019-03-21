@@ -8,7 +8,7 @@ STEPS="$BASE/steps"
 echo "env:"
 echo "  BASE: $BASE"
 echo "  REGISTRY: $REGISTRY"
-echo "  PATRONI_IMG: $REGISTRY/patroni"
+echo "  PATRONI_IMG: $REGISTRY/anapaya/patroni"
 echo "steps:"
 
 cat "$STEPS/test.yml"

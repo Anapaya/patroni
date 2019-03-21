@@ -3,7 +3,7 @@
     - $BASE/scripts/patroni
   plugins:
     - docker-compose#v3.0.0:
-        config: $BASE/files/dc-patroni.yml
+        config: $BASE/files/dc-patroni-tests.yml
         run: patroni
   retry:
     automatic:
