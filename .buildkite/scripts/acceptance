@@ -6,7 +6,8 @@ set -e
 sudo yum install python3 -y >/dev/null
 pip3 install --user plumbum >/dev/null
 
+# Build patroni image
+docker-compose -f $BASE/files/dc-acceptance.yml build >/dev/null
+
 # Run acceptance tests
 echo "do some tests now"
-docker-compose --log-level ERROR -f $BASE/files/docker-compose.yml up -d
-docker-compose --log-level ERROR -f $BASE/files/docker-compose.yml down

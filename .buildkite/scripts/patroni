@@ -1,0 +1,10 @@
+#!/bin/bash
+
+set -e
+
+echo Running unit tests using "$(python3 --version)"
+unbuffer python3 setup.py test
+python3 setup.py flake8
+
+echo Running acceptance tests using "$(python3 --version)"
+PATH=.:/usr/lib/postgresql/10/bin:$PATH DCS=consul unbuffer behave

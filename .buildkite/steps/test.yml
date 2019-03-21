@@ -1,14 +1,15 @@
-- label: Run patroni unit test and linting
+- label: Run patroni unit tests, linting and acceptance
   command:
-    - $BASE/scripts/unit
+    - $BASE/scripts/patroni
   plugins:
-    - docker#v3.0.1:
-        image: postgres:10
+    - docker-compose#v3.0.0:
+        config: $BASE/files/dc-patroni.yml
+        run: patroni
   retry:
     automatic:
       exit_status: 255
   timeout_in_minutes: 10
-- label: Run acceptance test
+- label: Run anapaya acceptance tests
   command: $BASE/scripts/acceptance
   retry:
     automatic:
