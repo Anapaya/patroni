@@ -1,0 +1,62 @@
+version: '3'
+services:
+  consul_server1:
+    command:
+    - agent
+    - -server
+    - -bootstrap-expect=2
+    - -client=0.0.0.0
+    - -retry-join=consul_server2
+    container_name: consul_server1
+    image: consul:1.3.1
+    environment:
+    - 'CONSUL_LOCAL_CONFIG={"session_ttl_min": "1s","server":true}'
+  consul_server2:
+    command:
+    - agent
+    - -server
+    - -bootstrap-expect=2
+    - -client=0.0.0.0
+    - -retry-join=consul_server1
+    container_name: consul_server2
+    image: consul:1.3.1
+    environment:
+    - 'CONSUL_LOCAL_CONFIG={"session_ttl_min": "1s","server":true}'
+
+  patroni_server1:
+    container_name: patroni_server1
+    image: patroni_dev:latest
+    volumes:
+      - '${BASE_DIR}/patroni0.yml:/patroni.yml:ro'
+      - '${BASE_DIR}/setup_cluster:/setup_cluster:ro'
+      - '${BASE_DIR}/initsql/:/initsql/:ro'
+    depends_on:
+      - consul_server1
+      - consul_server2
+    build:
+      context: ../../
+    environment:
+    - 'PATRONI_SCOPE=ptest'
+    - 'PATRONI_NAME=patroni_server1'
+    - 'PATRONI_SUPERUSER_PASSWORD=password'
+  patroni_server2:
+    container_name: patroni_server2
+    image: patroni_dev:latest
+    volumes:
+      - '${BASE_DIR}/patroni1.yml:/patroni.yml:ro'
+      - '${BASE_DIR}/setup_cluster:/setup_cluster:ro'
+      - '${BASE_DIR}/initsql/:/initsql/:ro'
+    depends_on:
+      - consul_server1
+      - consul_server2
+    environment:
+    - 'PATRONI_SCOPE=ptest'
+    - 'PATRONI_NAME=patroni_server2'
+    - 'PATRONI_SUPERUSER_PASSWORD=password'
+
+  # psql is just to do queries.
+  psql:
+    container_name: psql
+    image: postgres:10
+    environment:
+      - 'PGCONNECT_TIMEOUT=1'

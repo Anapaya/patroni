@@ -25,7 +25,7 @@ RUN set -ex \
             | grep -Ev '^python3-(sphinx|etcd|consul|kazoo|kubernetes)' \
             | xargs apt-get install -y vim curl less jq locales haproxy sudo \
                             python3-etcd python3-kazoo python3-pip busybox \
-    && pip3 install dumb-init \
+    && pip3 install dumb-init python-consul\
 \
     # Cleanup all locales but en_US.UTF-8
     && find /usr/share/i18n/charmaps/ -type f ! -name UTF-8.gz -delete \
@@ -133,7 +133,7 @@ ENV PGDATA=$PGDATA PATH=$PATH:$PGBIN
 COPY patroni /patroni/
 COPY extras/confd/conf.d/haproxy.toml /etc/confd/conf.d/
 COPY extras/confd/templates/haproxy.tmpl /etc/confd/templates/
-COPY patroni*.py docker/entrypoint.sh /
+COPY patroni*.py docker/ana_entrypoint.sh /
 COPY postgres?.yml $PGHOME/
 
 WORKDIR $PGHOME
@@ -153,4 +153,6 @@ RUN sed -i 's/env python/&3/' /patroni*.py \
 
 USER postgres
 
-ENTRYPOINT ["/bin/sh", "/entrypoint.sh"]
+EXPOSE 5432 8008
+
+ENTRYPOINT ["/bin/sh", "/ana_entrypoint.sh"]

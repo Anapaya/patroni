@@ -4,10 +4,29 @@ set -e
 
 # Install python3 and plumbum
 sudo yum install python3 -y >/dev/null
-pip3 install --user plumbum >/dev/null
+pip3 install --user plumbum python-consul >/dev/null
 
 # Build patroni image
 docker-compose -f $BASE/files/dc-patroni.yml build >/dev/null
 
+TOUT_DIR=$(mktemp -d /tmp/tout.XXXXXX)
+
+run_test() {
+    local TEST_NAME="$1"
+    echo "Running: $TEST_NAME"
+    local TST_DIR="$TOUT_DIR/$TEST_NAME"
+    mkdir -p "$TST_DIR"
+    ARTIFACTS_DIR="$TST_DIR" "./acceptance/${TEST_NAME}_acceptance/test.py" setup
+    ARTIFACTS_DIR="$TST_DIR" "./acceptance/${TEST_NAME}_acceptance/test.py" run
+    ARTIFACTS_DIR="$TST_DIR" "./acceptance/${TEST_NAME}_acceptance/test.py" teardown
+}
+
 # Run acceptance tests
-echo "do some tests now"
+export PYTHONPATH=acceptance/:.
+
+run_test leader_failure
+
+# Collect artifacts
+ARTIFACTS="patroni.${BUILDKITE_ORGANIZATION_SLUG}.${BUILDKITE_BUILD_NUMBER}"
+mkdir -p artifacts.out
+tar -caf "artifacts.out/$ARTIFACTS.tar.gz" "$TOUT_DIR"
