@@ -9,6 +9,7 @@ from plumbum import local
 from plumbum.cmd import (
     mkdir,
 )
+from plumbum.commands import ProcessExecutionError
 from plumbum.path.utils import copy
 
 from consul import Consul
@@ -112,7 +113,14 @@ class Util(object):
     def test_read_from(self, host: str, expected: str):
         logger.info("Test %s sees data", host)
         query = 'SELECT MAX(val) FROM test;'
-        result = self.psql(query, host)
+        result = ''
+        for _ in range(0, 5):
+            try:
+                result = self.psql(query, host)
+                break
+            except ProcessExecutionError:
+                time.sleep(0.5)
+                pass
         if result != expected:
             logger.error("Wrong result: %s, expected %s", result, expected)
             sys.exit(1)
