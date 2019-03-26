@@ -12,7 +12,7 @@
         config: $BASE/files/dc-patroni.yml
         push:
           - patroni:$PATRONI_IMG:latest
-  branches: "master"
+  branches: "anapaya"
 - label: Push patroni:$BUILDKITE_TAG
   plugins:
     - docker-login#v2.0.1:
