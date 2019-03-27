@@ -27,7 +27,7 @@ run_test() {
 
 run_tests() {
     export PYTHONPATH=acceptance/:.
-    for test in "leader_failure"; do
+    for test in "leader_failure" "follower_failure"; do
         run_test "$test"
         res=$((res+$?))
     done
