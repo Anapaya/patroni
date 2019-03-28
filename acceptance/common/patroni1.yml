@@ -1,6 +1,7 @@
-consul:
+consul2node:
   host: consul_server2:8500
   register_service: true
+  consul_timeout: 8
 
 bootstrap:
   dcs:

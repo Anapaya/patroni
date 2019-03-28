@@ -73,6 +73,9 @@ class Ha(object):
         self._start_timeout = None
         self._async_executor = AsyncExecutor(self.state_handler, self.wakeup)
         self.watchdog = patroni.watchdog
+        # TODO(lukedirtwalker): consider: instead of this, handle this in consul by setting _session
+        # = "y" when losing cluster connection.
+        self._dcs_failed = False
 
         # Each member publishes various pieces of information to the DCS using touch_member. This lock protects
         # the state and publishing procedure to have consistent ordering and avoid publishing stale values.
@@ -1183,10 +1186,18 @@ class Ha(object):
         self._start_timeout = value
 
     def _run_cycle(self):
-        dcs_failed = False
+        dcs_failed_before = self._dcs_failed
         try:
             self.state_handler.reset_cluster_info_state()
             self.load_cluster_from_dcs()
+            self._dcs_failed = False
+
+            # If the dcs failed before and we were leader, it means our consul node went down, and
+            # is now back up, so we should drop leadership as probably the other node assumed leader
+            # role.
+            if dcs_failed_before and self.has_lock():
+                self.release_leader_key_voluntarily()
+                return 'release leader key volunatrily after dcs is back working'
 
             if self.is_paused():
                 self.watchdog.disable()
@@ -1293,7 +1304,7 @@ class Ha(object):
                             self.state_handler.trigger_check_diverged_lsn()
                         self.state_handler.call_nowait(ACTION_ON_START)
         except DCSError:
-            dcs_failed = True
+            self._dcs_failed = True
             logger.error('Error communicating with DCS')
             if not self.is_paused() and self.state_handler.is_running() and self.state_handler.is_leader():
                 self.demote('offline')
@@ -1302,7 +1313,7 @@ class Ha(object):
         except (psycopg2.Error, PostgresConnectionException):
             return 'Error communicating with PostgreSQL. Will try again later'
         finally:
-            if not dcs_failed:
+            if not self._dcs_failed:
                 self.touch_member()
 
     def run_cycle(self):

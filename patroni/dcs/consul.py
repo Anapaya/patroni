@@ -35,11 +35,17 @@ class InvalidSession(ConsulException):
     """invalid session"""
 
 
+class ConsulNoClusterLeader(ConsulException):
+    """no cluster leader"""
+
+
 class HTTPClient(object):
 
-    def __init__(self, host='127.0.0.1', port=8500, token=None, scheme='http', verify=True, cert=None, ca_cert=None):
+    def __init__(self, host='127.0.0.1', port=8500, token=None, scheme='http', verify=True, cert=None,
+                 ca_cert=None, fixed_timeout=None):
         self.token = token
         self._read_timeout = 10
+        self._fixed_timeout = fixed_timeout
         self.base_uri = '{0}://{1}:{2}'.format(scheme, host, port)
         kwargs = {}
         if cert:
@@ -54,10 +60,15 @@ class HTTPClient(object):
             kwargs['ca_certs'] = ca_cert
         if verify or ca_cert:
             kwargs['cert_reqs'] = ssl.CERT_REQUIRED
+        if self._fixed_timeout:
+            kwargs['timeout'] = urllib3.Timeout(connect=self._fixed_timeout, read=self._fixed_timeout)
+            self._read_timeout = self._fixed_timeout
         self.http = urllib3.PoolManager(num_pools=10, **kwargs)
         self._ttl = None
 
     def set_read_timeout(self, timeout):
+        if self._fixed_timeout:
+            return
         self._read_timeout = timeout/3.0
 
     @property
@@ -78,6 +89,8 @@ class HTTPClient(object):
                 raise InvalidSessionTTL(msg)
             elif data.startswith('invalid session'):
                 raise InvalidSession(msg)
+            elif data.startswith('No cluster leader'):
+                raise ConsulNoClusterLeader(msg)
             else:
                 raise ConsulInternalError(msg)
         return base.Response(response.status, response.headers, data)
@@ -123,6 +136,7 @@ class ConsulClient(base.Consul):
         self._cert = kwargs.pop('cert', None)
         self._ca_cert = kwargs.pop('ca_cert', None)
         self._token = kwargs.get('token')
+        self._fixed_timeout = kwargs.pop('fixed_timeout', None)
         super(ConsulClient, self).__init__(*args, **kwargs)
 
     def connect(self, *args, **kwargs):
@@ -133,13 +147,23 @@ class ConsulClient(base.Consul):
             kwargs['ca_cert'] = self._ca_cert
         if self._token:
             kwargs['token'] = self._token
+        if self._fixed_timeout:
+            kwargs['fixed_timeout'] = self._fixed_timeout
         return HTTPClient(**kwargs)
 
 
 def catch_consul_errors(func):
+    """
+    Catches consul errors and returns false.
+    NOTE: assumes first arg is self, i.e. a Consul instance.
+    """
     def wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
+        except ConsulNoClusterLeader:
+            if args[0]._2node:
+                raise
+            return False
         except (RetryFailedError, ConsulException, HTTPException, HTTPError, socket.error, socket.timeout):
             return False
     return wrapper
@@ -175,6 +199,7 @@ class Consul(AbstractDCS):
     def __init__(self, config):
         super(Consul, self).__init__(config)
         self._scope = config['scope']
+        self._2node = config.get('consul2node', False)
         self._session = None
         self.__do_not_watch = False
         self._retry = Retry(deadline=config['retry_timeout'], max_delay=1, max_tries=-1,
@@ -205,6 +230,8 @@ class Consul(AbstractDCS):
             verify = parse_bool(verify)
         if isinstance(verify, bool):
             kwargs['verify'] = verify
+
+        kwargs['fixed_timeout'] = config.get('consul_timeout', None)
 
         self._client = ConsulClient(**kwargs)
         self.set_retry_timeout(config['retry_timeout'])
@@ -349,6 +376,11 @@ class Consul(AbstractDCS):
             return Cluster(initialize, config, leader, last_leader_operation, members, failover, sync, history)
         except NotFound:
             return Cluster(None, None, None, None, [], None, None, None)
+        except ConsulNoClusterLeader:
+            if self._2node:
+                raise
+            logger.exception('get_cluster')
+            raise ConsulError('Consul is not responding properly')
         except Exception:
             logger.exception('get_cluster')
             raise ConsulError('Consul is not responding properly')
@@ -375,6 +407,10 @@ class Consul(AbstractDCS):
         except InvalidSession:
             self._session = None
             logger.error('Our session disappeared from Consul, can not "touch_member"')
+        except ConsulNoClusterLeader:
+            if self._2node:
+                raise
+            logger.exception('touch_member')
         except Exception:
             logger.exception('touch_member')
         return False

@@ -1,6 +1,7 @@
-consul:
+consul2node:
   host: consul_server1:8500
   register_service: true
+  consul_timeout: 8
 
 bootstrap:
   # this section will be written into consul:/<namespace>/<scope>/config after initializing new cluster

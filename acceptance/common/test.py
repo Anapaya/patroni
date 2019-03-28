@@ -94,11 +94,9 @@ class Util(object):
     def postgres_url(self, host: str) -> str:
         return 'postgres://postgres:password@%s:5432/postgres' % host
 
-    def leader_name(self):
-        _, li = self.leader_info()
-        return self._leader_name(li)
-
-    def _leader_name(self, li) -> str:
+    def leader_name(self, li=None) -> str:
+        if not li:
+            _, li = self.leader_info()
         return str(li['Value'], 'utf8') if li and 'Value' in li else ''
 
     def psql(self, query: str, host: str) -> str:
@@ -110,8 +108,7 @@ class Util(object):
         query = 'INSERT INTO test (val) VALUES (%s);' % val
         self.psql(query, host)
 
-    def test_read_from(self, host: str, expected: str):
-        logger.info("Test %s sees data", host)
+    def read_from(self, host: str) -> str:
         query = 'SELECT MAX(val) FROM test;'
         result = ''
         for _ in range(0, 5):
@@ -121,6 +118,11 @@ class Util(object):
             except ProcessExecutionError:
                 time.sleep(0.5)
                 pass
+        return result
+
+    def test_read_from(self, host: str, expected: str):
+        logger.info("Test %s sees data", host)
+        result = self.read_from(host)
         if result != expected:
             logger.error("Wrong result: %s, expected %s", result, expected)
             sys.exit(1)
@@ -135,14 +137,14 @@ class Util(object):
 
     def wait_for_leader(self, index: int) -> str:
         index, li = self.leader_info(index)
-        ln = self._leader_name(li)
+        ln = self.leader_name(li)
         for _ in range(0, 20):
             if ln:
                 logger.info("Found leader: %s", ln)
                 return ln
             time.sleep(1)
             index, li = self.leader_info(index)
-            ln = self._leader_name(li)
+            ln = self.leader_name(li)
         logger.error("Didn't find new leader in time")
         sys.exit(1)
 
