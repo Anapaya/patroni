@@ -1197,7 +1197,9 @@ class Ha(object):
             # role.
             if dcs_failed_before and self.has_lock():
                 self.release_leader_key_voluntarily()
-                return 'release leader key volunatrily after dcs is back working'
+                # sleep a bit to make sure the other node can acquire leadership.
+                time.sleep(1)
+                return 'release leader key voluntarily after dcs is back working'
 
             if self.is_paused():
                 self.watchdog.disable()

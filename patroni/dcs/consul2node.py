@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 import logging
 from functools import wraps
+import time
 
 from patroni.dcs import (
     Cluster,
@@ -58,6 +59,7 @@ class Consul2Node(consul.Consul):
         self._static_mode = False
         self._static_cluster = None
         config['consul2node'] = True
+        self._max_leader_retries = int(config.get('leader_poll_retries', 100))
         super(Consul2Node, self).__init__(config)
 
     @try_super
@@ -71,16 +73,27 @@ class Consul2Node(consul.Consul):
         try:
             cluster = super()._load_cluster()
             if cluster:
+                sc = self._static_cluster
                 was_static = self._static_mode
                 self._static_cluster = cluster
                 self._static_mode = False
                 if was_static:
                     logger.info("consul back online, losing static mode.")
-                    self.attempt_to_acquire_leader()
-                    # Drop the leader node.
-                    c = cluster
-                    return Cluster(c.initialize, c.config, None, c.last_leader_operation, c.members,
-                                   c.failover, c.sync, c.history)
+                    leader = self.attempt_to_acquire_leader()
+                    retries = 0
+                    while not leader and retries < self._max_leader_retries:
+                        leader = self.attempt_to_acquire_leader()
+                        retries += 1
+                        time.sleep(0.01)  # 10 ms
+                    if not leader:
+                        logger.fatal("Not leader after being leader during consul outage. Data loss possible!")
+                    # Write static info back:
+                    if sc.last_leader_operation:
+                        super()._write_leader_optime(str(sc.last_leader_operation))
+                    if sc.history:
+                        super().set_history_value(sc.history.value)
+                    # Now reload the cluster again:
+                    return super()._load_cluster()
             return cluster
         except consul.ConsulNoClusterLeader:
             if self._static_mode:
