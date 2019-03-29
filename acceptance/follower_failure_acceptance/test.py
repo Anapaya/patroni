@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import logging
-import sys
 import time
 
 from acceptance.common.log import LogExec, initLog
@@ -24,26 +23,17 @@ class TestRun(test.Base):
     @LogExec(logger, "run")
     def main(self):
         self.util = test.Util(self.dc)
-        logger.info("Find leader in consul")
-        ln = self.util.leader_name()
-        if not ln:
-            logger.error("Failed to find leader")
-            sys.exit(1)
-
-        self.util.test_write_to(ln, 1)
-        replica = self.util.wait_for_replica()
-        self.util.test_read_from(replica, "1")
-        self.util.test_not_writable(replica)
+        initial_leader, initial_replica = self.util.initial_check()
 
         # Now kill the replica
-        logger.info("Killing %s", replica)
-        self.util.dc('kill', replica)
+        logger.info("Killing %s", initial_replica)
+        self.util.dc('kill', initial_replica)
         time.sleep(1)
-        self.util.test_write_to(ln, 2)
+        self.util.test_write_to(initial_leader, 2)
 
         # Restart and check that we can see the data.
-        logger.info("Restart %s", replica)
-        self.dc('up', '-d', replica)
+        logger.info("Restart %s", initial_replica)
+        self.dc('up', '-d', initial_replica)
         self.util.test_read_from(self.util.wait_for_replica(), "2")
 
 

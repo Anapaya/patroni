@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import logging
-import sys
 import time
 
 from acceptance.common.log import LogExec, initLog
@@ -24,20 +23,11 @@ class TestRun(test.Base):
     @LogExec(logger, "run")
     def main(self):
         self.util = test.Util(self.dc)
-        logger.info("Find leader in consul")
-        ln = self.util.leader_name()
-        if not ln:
-            logger.error("Failed to find leader")
-            sys.exit(1)
+        initial_leader, initial_replica = self.util.initial_check()
 
-        self.util.test_write_to(ln, 1)
-        replica = self.util.wait_for_replica()
-        self.util.test_read_from(replica, "1")
-        self.util.test_not_writable(replica)
-
-        self.test_switch_leader(ln, 2)
+        self.test_switch_leader(initial_leader, 2)
         time.sleep(10)  # let the cluster stabilize again.
-        self.test_switch_leader(replica, 3)
+        self.test_switch_leader(initial_replica, 3)
 
     def test_switch_leader(self, current_leader: str, expected_val):
         modify_idx, _ = self.util.leader_info()

@@ -7,6 +7,7 @@ from typing import Tuple
 from plumbum import cli
 from plumbum import local
 from plumbum.cmd import (
+    curl,
     mkdir,
 )
 from plumbum.commands import ProcessExecutionError
@@ -168,3 +169,44 @@ class Util(object):
             if 'role' in member and member['role'] == 'replica':
                 return m
         return None
+
+    def initial_check(self) -> Tuple[str, str]:
+        """
+        Checks initial connectivity return (leader,replica) tuple.
+        """
+        logger.info("Find leader in consul")
+        initial_leader = self.leader_name()
+        if not initial_leader:
+            logger.error("Failed to find leader")
+            sys.exit(1)
+
+        self.test_write_to(initial_leader, 1)
+        initial_replica = self.wait_for_replica()
+        self.test_read_from(initial_replica, "1")
+        self.test_not_writable(initial_replica)
+        return initial_leader, initial_replica
+
+    def wait_until_role(self, name: str, role: str):
+        """
+        Waits until the node has the given role in the patroni API.
+        """
+        ip = container_ip(name)
+        logger.info("Waiting until %s (%s) has role %s", name, ip, role)
+        info = self.patroni_info(ip)
+        for _ in range(0, 30):
+            if info and info['role'] == role:
+                logger.info("%s is now %s", name, role)
+                return
+            time.sleep(1)
+            info = self.patroni_info(ip)
+        logger.error("%s didn't become %s in time", name, role)
+        sys.exit(1)
+
+    def patroni_info(self, ip: str):
+        """
+        Returns the node info from the patroni API.
+        """
+        out = curl('-sS', 'http://%s:8008' % ip)
+        if not out:
+            return None
+        return json.loads(out)

@@ -84,7 +84,7 @@ class Consul2Node(consul.Consul):
                     while not leader and retries < self._max_leader_retries:
                         leader = self.attempt_to_acquire_leader()
                         retries += 1
-                        time.sleep(0.01)  # 10 ms
+                        time.sleep(0.05)  # 50 ms
                     if not leader:
                         logger.fatal("Not leader after being leader during consul outage. Data loss possible!")
                     # Write static info back:

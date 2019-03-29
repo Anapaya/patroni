@@ -22,14 +22,16 @@ run_test() {
     mkdir -p "$TST_DIR"
     ARTIFACTS_DIR="$TST_DIR" "./acceptance/${TEST_NAME}_acceptance/test.py" setup &&\
     ARTIFACTS_DIR="$TST_DIR" "./acceptance/${TEST_NAME}_acceptance/test.py" run
-    res=$?
+    local r=$?
     ARTIFACTS_DIR="$TST_DIR" "./acceptance/${TEST_NAME}_acceptance/test.py" teardown
-    return "$res"
+    return "$r"
 }
 
 run_tests() {
     export PYTHONPATH=acceptance/:.
-    for test in "leader_failure" "follower_failure" "2node_consul_leader_failure"; do
+    for d in  ./acceptance/*_acceptance; do
+        local td=$(basename "$d")
+        local test=${td%"_acceptance"}
         run_test "$test"
         res=$((res+$?))
     done
