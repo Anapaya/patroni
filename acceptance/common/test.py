@@ -128,6 +128,18 @@ class Util(object):
             logger.error("Wrong result: %s, expected %s", result, expected)
             sys.exit(1)
 
+    def read_until_expected(self, host: str, expected: str, max_repeats: int = 10):
+        """
+        Reads repeadetly from the DB until the expected result is returned or it tried 'max_repeats'
+        times.
+        """
+        for _ in range(0, max_repeats):
+            result = self.read_from(host)
+            if result == expected:
+                break
+            time.sleep(1)
+        self.test_read_from(host, expected)
+
     def test_not_writable(self, host: str):
         logger.info("Test %s is not writable", host)
         query = 'INSERT INTO test (val) VALUES (2);'
@@ -206,7 +218,34 @@ class Util(object):
         """
         Returns the node info from the patroni API.
         """
-        out = curl('-sS', 'http://%s:8008' % ip)
+        # retcode 7 means the server is not reachable.
+        out = curl('-sS', 'http://%s:8008' % ip, retcode=(0, 7))
         if not out:
             return None
         return json.loads(out)
+
+    def kill_consul(self, patroni_name: str):
+        leader_idx = patroni_name[len('patroni_server'):]
+        consul = 'consul_server%s' % leader_idx
+        logger.info("Killing %s", consul)
+        self.dc('kill', consul)
+
+    def restore_consul(self, patroni_name: str):
+        leader_idx = patroni_name[len('patroni_server'):]
+        consul = 'consul_server%s' % leader_idx
+        logger.info("Restart %s", consul)
+        self.dc('up', '-d', consul)
+
+    def kill_node(self, patroni_name: str):
+        leader_idx = patroni_name[len('patroni_server'):]
+        consul = 'consul_server%s' % leader_idx
+        logger.info("Killing node %s", leader_idx)
+        self.dc('kill', consul)
+        self.dc('kill', patroni_name)
+
+    def restore_node(self, patroni_name: str):
+        leader_idx = patroni_name[len('patroni_server'):]
+        consul = 'consul_server%s' % leader_idx
+        logger.info("Restart node %s", leader_idx)
+        self.dc('up', '-d', consul)
+        self.dc('up', '-d', patroni_name)

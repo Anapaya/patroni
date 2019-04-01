@@ -26,7 +26,7 @@ class TestRun(test.Base):
         self.util = test.Util(self.dc)
         initial_leader, initial_replica = self.util.initial_check()
 
-        self.kill_consul(initial_leader)
+        self.util.kill_consul(initial_leader)
         self.util.wait_until_role(initial_replica, 'master')
         self.util.test_write_to(initial_replica, 2)
         self.util.test_not_writable(initial_leader)
@@ -37,7 +37,7 @@ class TestRun(test.Base):
         # wait a little so that we can "stabilize" in this state.
         time.sleep(3)
 
-        self.restore_consul(initial_leader)
+        self.util.restore_consul(initial_leader)
         # wait a bit here. Note that on consul the old leader is still stored. It takes a bit until
         # the leader change is reflected in consul. But in the patroni API we will already see the
         # correct node.
@@ -46,27 +46,9 @@ class TestRun(test.Base):
 
         self.util.test_read_from(initial_replica, "2")
         self.util.wait_until_role(initial_leader, 'replica')
-        # Wait until update propagated
-        for _ in range(0, 10):
-            result = self.util.read_from(initial_leader)
-            if result == "2":
-                break
-            time.sleep(1)
-        self.util.test_read_from(initial_leader, "2")
+        self.util.read_until_expected(initial_leader, "2")
 
         logger.info("Test successful")
-
-    def kill_consul(self, patroni_name: str):
-        leader_idx = patroni_name[len('patroni_server'):]
-        consul = 'consul_server%s' % leader_idx
-        logger.info("Killing %s", consul)
-        self.util.dc('kill', consul)
-
-    def restore_consul(self, patroni_name: str):
-        leader_idx = patroni_name[len('patroni_server'):]
-        consul = 'consul_server%s' % leader_idx
-        logger.info("Restart %s", consul)
-        self.util.dc('up', '-d', consul)
 
 
 if __name__ == "__main__":
