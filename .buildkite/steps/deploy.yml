@@ -26,4 +26,4 @@
         config: $BASE/files/dc-patroni.yml
         push:
           - "patroni:$PATRONI_IMG:$BUILDKITE_TAG"
-  branches: "v*.*.*"
+  branches: "ana-v*.*.*"
